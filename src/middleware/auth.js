@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 const { httpError } = require('../utils/http');
-const { sanitizeUser, isRoleAllowed, verifyAccessToken } = require('../utils/auth');
+const { sanitizeUser, verifyAccessToken } = require('../utils/auth');
 
 async function authenticate(req, res, next) {
   const header = req.headers.authorization || '';
@@ -11,6 +11,7 @@ async function authenticate(req, res, next) {
   }
 
   try {
+    // Verify the token, then load the current database user so authorization never trusts a role from the token.
     const payload = verifyAccessToken(match[1]);
     if (!payload || !payload.sub) {
       return next(httpError(401, 'INVALID_TOKEN', 'Authentication failed'));
@@ -31,13 +32,14 @@ async function authenticate(req, res, next) {
   }
 }
 
-function authorize(minimumRole) {
+// Admin-only routes compare the authenticated database role exactly; customers and legacy staff are never admins.
+function authorize(requiredRole) {
   return (req, res, next) => {
     if (!req.user) {
       return next(httpError(401, 'AUTH_REQUIRED', 'Authentication required'));
     }
 
-    if (!isRoleAllowed(req.user.role, minimumRole)) {
+    if (req.user.role !== requiredRole) {
       return next(httpError(403, 'FORBIDDEN', 'You do not have permission to perform this action'));
     }
 

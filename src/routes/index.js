@@ -58,21 +58,6 @@ router.get('/auth/me', [authenticate], asyncHandler(async (req, res) => {
   single(res, req.user);
 }));
 
-router.post('/auth/staff', [authenticate, authorize(USER_ROLES.ADMIN), authLimiter, body('full_name').trim().isString().isLength({ min: 1, max: 120 }).withMessage('full_name is required'), body('email').trim().isEmail().isLength({ min: 3, max: 255 }).withMessage('email must be a valid email address'), body('phone').trim().isString().isLength({ min: 5, max: 20 }).withMessage('phone is required'), body('password').isString().isLength({ min: 8, max: 72 }).withMessage('password must be at least 8 characters long'), validate], asyncHandler(async (req, res) => {
-  const fullName = String(req.body.full_name).trim();
-  const email = normalizeEmail(req.body.email);
-  const phone = String(req.body.phone).trim();
-  const password = String(req.body.password);
-
-  const [existing] = await pool.execute('SELECT id FROM users WHERE email = ? LIMIT 1', [email]);
-  if (existing.length) throw httpError(409, 'EMAIL_IN_USE', 'An account with that email already exists');
-
-  const passwordHash = await hashPassword(password);
-  const [result] = await pool.execute('INSERT INTO users (full_name, email, phone, password_hash, role) VALUES (?, ?, ?, ?, ?)', [fullName, email, phone, passwordHash, USER_ROLES.STAFF]);
-  const [users] = await pool.execute('SELECT * FROM users WHERE id = ?', [result.insertId]);
-  single(res, sanitizeUser(users[0]), 201);
-}));
-
 router.get('/menu-items', [...pagination, query('search').optional().isString(), query('category').optional().isString(), query('available').optional().isIn(['true', 'false']), validate], asyncHandler(async (req, res) => {
   const page = Number(req.query.page || 1), limit = Number(req.query.limit || 20), offset = (page - 1) * limit;
   const where = [], args = [];
@@ -116,7 +101,7 @@ router.patch('/menu-items/:id/availability', [authenticate, authorize(USER_ROLES
   single(res, rows[0]);
 }));
 
-router.post('/orders', [authenticate, body('payment_method').isIn(['cash', 'upi', 'card']), body('items').isArray({ min: 1 }), body('items.*.menu_item_id').isInt({ min: 1 }), body('items.*.quantity').isInt({ min: 1, max: 999 }), validate], asyncHandler(async (req, res) => {
+router.post('/orders', [authenticate, authorize(USER_ROLES.CUSTOMER), body('payment_method').isIn(['cash', 'upi', 'card']), body('items').isArray({ min: 1 }), body('items.*.menu_item_id').isInt({ min: 1 }), body('items.*.quantity').isInt({ min: 1, max: 999 }), validate], asyncHandler(async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
@@ -153,7 +138,10 @@ router.post('/orders', [authenticate, body('payment_method').isIn(['cash', 'upi'
   }
 }));
 
-router.get('/orders', [authenticate, ...pagination, query('status').optional().isIn(['pending','confirmed','preparing','ready','completed','cancelled']), validate], asyncHandler(async (req, res) => {
+router.get('/orders', [authenticate, ...pagination, query('status').optional().isIn(['pending','completed','cancelled']), validate], asyncHandler(async (req, res) => {
+  if (![USER_ROLES.CUSTOMER, USER_ROLES.ADMIN].includes(req.user.role)) {
+    throw httpError(403, 'FORBIDDEN', 'You do not have permission to view orders');
+  }
   const page = Number(req.query.page || 1), limit = Number(req.query.limit || 20), offset = (page - 1) * limit;
   const isCustomer = req.user.role === USER_ROLES.CUSTOMER;
   let where = '';
@@ -164,8 +152,10 @@ router.get('/orders', [authenticate, ...pagination, query('status').optional().i
     args.push(req.user.id);
   }
 
-  if (req.query.status) {
-    where += where ? ' AND status = ?' : 'WHERE status = ?';
+  if (req.query.status === 'cancelled') {
+    where += where ? ' AND cancelled_at IS NOT NULL' : 'WHERE cancelled_at IS NOT NULL';
+  } else if (req.query.status) {
+    where += where ? ' AND status = ? AND cancelled_at IS NULL' : 'WHERE status = ? AND cancelled_at IS NULL';
     args.push(req.query.status);
   }
 
@@ -175,6 +165,9 @@ router.get('/orders', [authenticate, ...pagination, query('status').optional().i
 }));
 
 router.get('/orders/:id', [authenticate, idRule, validate], asyncHandler(async (req, res) => {
+  if (![USER_ROLES.CUSTOMER, USER_ROLES.ADMIN].includes(req.user.role)) {
+    throw httpError(403, 'FORBIDDEN', 'You do not have permission to view orders');
+  }
   const isCustomer = req.user.role === USER_ROLES.CUSTOMER;
   let queryText = 'SELECT * FROM orders WHERE id = ?';
   const params = [req.params.id];
@@ -189,15 +182,16 @@ router.get('/orders/:id', [authenticate, idRule, validate], asyncHandler(async (
   single(res, { ...orders[0], items });
 }));
 
-router.patch('/orders/:id/status', [authenticate, authorize(USER_ROLES.STAFF), idRule, body('status').isIn(['pending','confirmed','preparing','ready','completed']), validate], asyncHandler(async (req, res) => {
+router.patch('/orders/:id/status', [authenticate, authorize(USER_ROLES.ADMIN), idRule, body('status').isString().withMessage('status must be a string'), validate], asyncHandler(async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const [rows] = await conn.execute('SELECT status FROM orders WHERE id = ? FOR UPDATE', [req.params.id]);
+    const [rows] = await conn.execute('SELECT status, cancelled_at FROM orders WHERE id = ? FOR UPDATE', [req.params.id]);
     if (!rows.length) throw httpError(404, 'ORDER_NOT_FOUND', 'Order not found');
-    const transitions = { pending: 'confirmed', confirmed: 'preparing', preparing: 'ready', ready: 'completed' };
-    if (transitions[rows[0].status] !== req.body.status) throw httpError(409, 'INVALID_STATUS_TRANSITION', `Cannot change order status from ${rows[0].status} to ${req.body.status}`);
-    await conn.execute('UPDATE orders SET status = ? WHERE id = ?', [req.body.status, req.params.id]);
+    if (req.body.status !== 'completed' || rows[0].status !== 'pending' || rows[0].cancelled_at) {
+      throw httpError(409, 'INVALID_STATUS_TRANSITION', 'Only an active pending order can be marked completed');
+    }
+    await conn.execute("UPDATE orders SET status = 'completed' WHERE id = ?", [req.params.id]);
     await conn.commit();
     const [updated] = await pool.execute('SELECT * FROM orders WHERE id = ?', [req.params.id]);
     single(res, updated[0]);
@@ -210,14 +204,17 @@ router.patch('/orders/:id/status', [authenticate, authorize(USER_ROLES.STAFF), i
 }));
 
 router.patch('/orders/:id/cancel', [authenticate, idRule, validate], asyncHandler(async (req, res) => {
+  if (![USER_ROLES.CUSTOMER, USER_ROLES.ADMIN].includes(req.user.role)) {
+    throw httpError(403, 'FORBIDDEN', 'You do not have permission to cancel orders');
+  }
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const [rows] = await conn.execute('SELECT status, user_id FROM orders WHERE id = ? FOR UPDATE', [req.params.id]);
+    const [rows] = await conn.execute('SELECT status, user_id, cancelled_at FROM orders WHERE id = ? FOR UPDATE', [req.params.id]);
     if (!rows.length) throw httpError(404, 'ORDER_NOT_FOUND', 'Order not found');
     if (req.user.role === USER_ROLES.CUSTOMER && rows[0].user_id !== req.user.id) throw httpError(404, 'ORDER_NOT_FOUND', 'Order not found');
-    if (!['pending', 'confirmed'].includes(rows[0].status)) throw httpError(409, 'CANCELLATION_NOT_ALLOWED', 'Only pending or confirmed orders can be cancelled');
-    await conn.execute("UPDATE orders SET status = 'cancelled' WHERE id = ?", [req.params.id]);
+    if (rows[0].status !== 'pending' || rows[0].cancelled_at) throw httpError(409, 'CANCELLATION_NOT_ALLOWED', 'Only an active pending order can be cancelled');
+    await conn.execute('UPDATE orders SET cancelled_at = CURRENT_TIMESTAMP WHERE id = ?', [req.params.id]);
     await conn.commit();
     const [updated] = await pool.execute('SELECT * FROM orders WHERE id = ?', [req.params.id]);
     single(res, updated[0]);
@@ -229,14 +226,14 @@ router.patch('/orders/:id/cancel', [authenticate, idRule, validate], asyncHandle
   }
 }));
 
-router.get('/reports/daily-sales', [authenticate, authorize(USER_ROLES.STAFF), query('date').optional().isISO8601({ strict: true }).matches(/^\d{4}-\d{2}-\d{2}$/), validate], asyncHandler(async (req, res) => {
+router.get('/reports/daily-sales', [authenticate, authorize(USER_ROLES.ADMIN), query('date').optional().isISO8601({ strict: true }).matches(/^\d{4}-\d{2}-\d{2}$/), validate], asyncHandler(async (req, res) => {
   const date = req.query.date || new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-  const [[row]] = await pool.execute("SELECT COUNT(*) AS order_count, COALESCE(SUM(total_amount), 0.00) AS total_sales FROM orders WHERE status = 'completed' AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)", [date, date]);
+  const [[row]] = await pool.execute("SELECT COUNT(*) AS order_count, COALESCE(SUM(total_amount), 0.00) AS total_sales FROM orders WHERE status = 'completed' AND cancelled_at IS NULL AND created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY)", [date, date]);
   single(res, { date, completed_order_count: Number(row.order_count), total_sales: row.total_sales });
 }));
 
-router.get('/reports/top-selling-items', [authenticate, authorize(USER_ROLES.STAFF), query('limit').optional().isInt({ min: 1, max: 100 }), query('from').optional().isISO8601({ strict: true }).matches(/^\d{4}-\d{2}-\d{2}$/), query('to').optional().isISO8601({ strict: true }).matches(/^\d{4}-\d{2}-\d{2}$/), validate], asyncHandler(async (req, res) => {
-  const limit = Number(req.query.limit || 10), conditions = ["o.status = 'completed'"], args = [];
+router.get('/reports/top-selling-items', [authenticate, authorize(USER_ROLES.ADMIN), query('limit').optional().isInt({ min: 1, max: 100 }), query('from').optional().isISO8601({ strict: true }).matches(/^\d{4}-\d{2}-\d{2}$/), query('to').optional().isISO8601({ strict: true }).matches(/^\d{4}-\d{2}-\d{2}$/), validate], asyncHandler(async (req, res) => {
+  const limit = Number(req.query.limit || 10), conditions = ["o.status = 'completed'", 'o.cancelled_at IS NULL'], args = [];
   if (req.query.from) { conditions.push('o.created_at >= ?'); args.push(req.query.from); }
   if (req.query.to) { conditions.push('o.created_at < DATE_ADD(?, INTERVAL 1 DAY)'); args.push(req.query.to); }
   const [rows] = await pool.query(`SELECT oi.menu_item_id, oi.item_name, SUM(oi.quantity) AS quantity_sold FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE ${conditions.join(' AND ')} GROUP BY oi.menu_item_id, oi.item_name ORDER BY quantity_sold DESC, oi.item_name LIMIT ?`, [...args, limit]);

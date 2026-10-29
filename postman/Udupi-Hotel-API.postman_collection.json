@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Udupi Hotel API",
-    "description": "Menu, order, authentication, and sales API examples",
+    "description": "Menu, order, authentication, and sales API examples. Customers and admins use the same login endpoint; successful login stores the JWT in the token variable.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -9,8 +9,8 @@
     { "key": "token", "value": "" },
     { "key": "menuItemId", "value": "1" },
     { "key": "orderId", "value": "1" },
-    { "key": "customerEmail", "value": "customer@example.com" },
-    { "key": "customerPassword", "value": "StrongPass123!" }
+    { "key": "userEmail", "value": "customer@example.com" },
+    { "key": "userPassword", "value": "StrongPass123!" }
   ],
   "item": [
     {
@@ -24,13 +24,13 @@
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"full_name\": \"Ananya Rao\",\n  \"email\": \"{{customerEmail}}\",\n  \"phone\": \"9876543210\",\n  \"password\": \"{{customerPassword}}\"\n}"
+          "raw": "{\n  \"full_name\": \"Ananya Rao\",\n  \"email\": \"{{userEmail}}\",\n  \"phone\": \"9876543210\",\n  \"password\": \"{{userPassword}}\"\n}"
         },
         "url": "{{baseUrl}}/api/auth/register"
       }
     },
     {
-      "name": "Login customer",
+      "name": "Login (customer or admin)",
       "event": [
         {
           "listen": "test",
@@ -47,7 +47,7 @@
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"password\": \"{{customerPassword}}\"\n}"
+          "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}"
         },
         "url": "{{baseUrl}}/api/auth/login"
       }
@@ -96,7 +96,7 @@
       }
     },
     {
-      "name": "Complete order (staff/admin)",
+      "name": "Complete order (admin only)",
       "request": {
         "method": "PATCH",
         "header": [

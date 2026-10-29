@@ -3,14 +3,7 @@ const jwt = require('jsonwebtoken');
 
 const USER_ROLES = Object.freeze({
   CUSTOMER: 'CUSTOMER',
-  STAFF: 'STAFF',
   ADMIN: 'ADMIN'
-});
-
-const ROLE_RANK = Object.freeze({
-  CUSTOMER: 1,
-  STAFF: 2,
-  ADMIN: 3
 });
 
 function normalizeEmail(value = '') {
@@ -48,15 +41,6 @@ function verifyAccessToken(token) {
   return jwt.verify(token, secret, { issuer: 'udupi-hotel-api' });
 }
 
-function isRoleAllowed(userRole, minimumRole) {
-  const currentRank = ROLE_RANK[userRole];
-  const minimumRank = ROLE_RANK[minimumRole];
-  if (!Number.isInteger(currentRank) || !Number.isInteger(minimumRank)) {
-    return false;
-  }
-  return currentRank >= minimumRank;
-}
-
 module.exports = {
   USER_ROLES,
   normalizeEmail,
@@ -64,6 +48,5 @@ module.exports = {
   hashPassword,
   verifyPassword,
   signAccessToken,
-  verifyAccessToken,
-  isRoleAllowed
+  verifyAccessToken
 };

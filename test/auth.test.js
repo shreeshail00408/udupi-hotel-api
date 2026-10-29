@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { normalizeEmail, sanitizeUser, USER_ROLES, isRoleAllowed } = require('../src/utils/auth');
+const { normalizeEmail, sanitizeUser, USER_ROLES } = require('../src/utils/auth');
+const { authorize } = require('../src/middleware/auth');
 
 test('normalizeEmail trims and lowercases email before storage', () => {
   assert.equal(normalizeEmail('  User.Name+Tag@Example.COM  '), 'user.name+tag@example.com');
@@ -29,8 +30,18 @@ test('sanitizeUser removes password material and keeps the role metadata', () =>
   });
 });
 
-test('isRoleAllowed allows only the configured role ladder', () => {
-  assert.equal(isRoleAllowed(USER_ROLES.ADMIN, USER_ROLES.ADMIN), true);
-  assert.equal(isRoleAllowed(USER_ROLES.STAFF, USER_ROLES.ADMIN), false);
-  assert.equal(isRoleAllowed(USER_ROLES.CUSTOMER, USER_ROLES.STAFF), false);
+test('admin authorization requires an exact ADMIN database role', () => {
+  const middleware = authorize(USER_ROLES.ADMIN);
+  for (const role of ['CUSTOMER', 'STAFF', 'ADMIN']) {
+    let error;
+    middleware({ user: { role } }, {}, err => { error = err; });
+    assert.equal(Boolean(error), role !== USER_ROLES.ADMIN, `${role} authorization result`);
+    if (error) assert.equal(error.status, 403);
+  }
+});
+
+test('admin authorization requires an authenticated user', () => {
+  let error;
+  authorize(USER_ROLES.ADMIN)({}, {}, err => { error = err; });
+  assert.equal(error.status, 401);
 });

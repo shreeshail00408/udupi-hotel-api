@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) NOT NULL,
   phone VARCHAR(20) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  role ENUM('CUSTOMER','STAFF','ADMIN') NOT NULL DEFAULT 'CUSTOMER',
+  role ENUM('CUSTOMER','ADMIN') NOT NULL DEFAULT 'CUSTOMER',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -36,10 +36,11 @@ CREATE TABLE IF NOT EXISTS orders (
   phone VARCHAR(20) NOT NULL,
   payment_method ENUM('cash','upi','card') NOT NULL,
   total_amount DECIMAL(10,2) NOT NULL,
-  status ENUM('pending','confirmed','preparing','ready','completed','cancelled') NOT NULL DEFAULT 'pending',
+  status ENUM('pending','completed') NOT NULL DEFAULT 'pending',
+  cancelled_at TIMESTAMP NULL DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id), INDEX idx_orders_status_created (status, created_at), INDEX idx_orders_created (created_at), INDEX idx_orders_user_id (user_id),
+  PRIMARY KEY (id), INDEX idx_orders_status_created (status, created_at), INDEX idx_orders_created (created_at), INDEX idx_orders_user_id (user_id), INDEX idx_orders_cancelled_at (cancelled_at),
   CONSTRAINT fk_orders_user FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE CASCADE ON DELETE SET NULL,
   CONSTRAINT chk_order_total CHECK (total_amount >= 0)
 ) ENGINE=InnoDB;

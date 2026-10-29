@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f8f6f1">
+    <title>Udupi House — South Indian Kitchen</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Udupi House home">
+        <span class="brand-mark" aria-hidden="true">U</span>
+        <span>udupi<span class="brand-light">house</span><small>SOUTH INDIAN KITCHEN</small></span>
+      </a>
+      <nav class="main-nav" aria-label="Main navigation">
+        <a href="#menu">Our menu</a>
+        <a href="#story">Our kitchen</a>
+        <a href="/database.html">Database presentation</a>
+      </nav>
+      <div class="header-actions">
+        <button class="text-button account-button" id="account-button" type="button">Sign in</button>
+        <button class="bag-button" id="bag-button" type="button" aria-label="Open your bag">
+          Your bag <span class="bag-count" id="bag-count">0</span>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <span class="eyebrow"><span class="eyebrow-dot"></span> GOOD FOOD, MADE WITH HEART</span>
+          <h1 id="hero-title">A little taste<br>of <em>South India.</em></h1>
+          <p>From the first crackle of a dosa to that last sip of filter coffee, there's a place for you at our table.</p>
+          <a class="primary-link" href="#menu">Explore the menu <span aria-hidden="true">↘</span></a>
+          <div class="hero-note"><span class="note-icon" aria-hidden="true">✳</span> Freshly made. Always vegetarian.</div>
+        </div>
+        <div class="hero-art" aria-label="Illustration of a traditional dosa meal">
+          <div class="sun-disc"></div>
+          <div class="hero-orbit orbit-one"></div>
+          <div class="hero-orbit orbit-two"></div>
+          <div class="hero-dish">
+            <div class="dosa"></div>
+            <div class="chutney chutney-green"></div>
+            <div class="chutney chutney-orange"></div>
+            <div class="sambar"></div>
+          </div>
+          <span class="art-label art-label-top">FRESH OFF<br>THE TAWA</span>
+          <span class="art-label art-label-bottom">MADE WITH<br>LOVE & GHEE</span>
+          <span class="art-spark spark-one" aria-hidden="true">✳</span>
+          <span class="art-spark spark-two" aria-hidden="true">✦</span>
+          <span class="art-leaf leaf-one" aria-hidden="true">⌁</span>
+          <span class="art-leaf leaf-two" aria-hidden="true">⌁</span>
+        </div>
+      </section>
+
+      <section class="menu-section" id="menu">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">A SEAT AT OUR TABLE</span>
+            <h2>Made to make you <em>happy.</em></h2>
+          </div>
+          <label class="search-box">
+            <span aria-hidden="true">⌕</span>
+            <input id="search-input" type="search" placeholder="Find your favourite..." autocomplete="off">
+          </label>
+        </div>
+        <div class="category-list" id="category-list" aria-label="Filter menu by category"></div>
+        <p class="status-message" id="menu-status" role="status">Loading today's menu…</p>
+        <div class="menu-grid" id="menu-grid"></div>
+      </section>
+
+      <section class="story-strip" id="story">
+        <span class="story-flower" aria-hidden="true">✳</span>
+        <div><span class="eyebrow">A LITTLE MORE THAN A MEAL</span><h2>Come hungry.<br>Leave <em>like family.</em></h2></div>
+        <p>Good food brings us together. We make every plate fresh, with a little patience and a lot of love.</p>
+        <a href="#menu" aria-label="Browse our menu">Find your favourite <span aria-hidden="true">↗</span></a>
+      </section>
+
+      <section class="orders-section hidden" id="orders-section">
+        <div class="section-heading">
+          <div><span class="eyebrow">YOUR TABLE</span><h2>Your recent <em>orders.</em></h2></div>
+        </div>
+        <p class="status-message" id="orders-status" role="status"></p>
+        <div class="orders-list" id="orders-list"></div>
+      </section>
+
+      <section class="admin-section hidden" id="admin-section">
+        <div class="section-heading">
+          <div><span class="eyebrow">RESTAURANT CONSOLE</span><h2>Admin — Order <em>Management.</em></h2></div>
+          <button class="refresh-button" id="refresh-admin-orders" type="button">Refresh orders <span aria-hidden="true">↻</span></button>
+        </div>
+        <p class="status-message" id="admin-orders-status" role="status"></p>
+        <div class="admin-orders-list" id="admin-orders-list"></div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="brand footer-brand" href="/">
+        <span class="brand-mark" aria-hidden="true">U</span>
+        <span>udupi<span class="brand-light">house</span><small>SOUTH INDIAN KITCHEN</small></span>
+      </a>
+      <span>Made fresh, shared with love.</span>
+      <a href="/api-docs">API docs <span aria-hidden="true">↗</span></a>
+    </footer>
+
+    <div class="overlay hidden" id="overlay"></div>
+    <aside class="cart-panel" id="cart-panel" aria-labelledby="cart-title" aria-hidden="true">
+      <div class="panel-heading">
+        <div><span class="eyebrow">GOOD CHOICE</span><h2 id="cart-title">Your bag<span class="heading-period">.</span></h2></div>
+        <button class="icon-button" id="close-cart" type="button" aria-label="Close bag">×</button>
+      </div>
+      <div class="cart-items" id="cart-items"></div>
+      <div class="cart-empty" id="cart-empty"><span aria-hidden="true">✳</span><p>Your bag is looking a little empty.</p><a href="#menu" id="browse-menu">Let's find something good.</a></div>
+      <form class="checkout-form hidden" id="checkout-form">
+        <label for="payment-method">How would you like to pay?</label>
+        <select id="payment-method" name="payment_method">
+          <option value="upi">UPI</option>
+          <option value="cash">Cash</option>
+          <option value="card">Card</option>
+        </select>
+        <div class="cart-total"><span>Total</span><strong id="cart-total">₹0</strong></div>
+        <p class="form-message" id="checkout-message" role="alert"></p>
+        <button class="checkout-button" id="checkout-button" type="submit">Place my order <span aria-hidden="true">→</span></button>
+        <p class="checkout-note">Your order is made fresh just for you.</p>
+      </form>
+    </aside>
+
+    <dialog class="auth-dialog" id="auth-dialog">
+      <button class="icon-button dialog-close" id="close-auth" type="button" aria-label="Close sign in">×</button>
+      <span class="eyebrow" id="auth-eyebrow">WELCOME TO OUR TABLE</span>
+      <h2 id="auth-title">Good to see <em>you.</em></h2>
+      <p class="auth-intro" id="auth-intro">Sign in to place an order and keep up with your favourites.</p>
+      <div class="auth-tabs" role="tablist" aria-label="Account action">
+        <button class="auth-tab active" id="login-tab" type="button" role="tab" aria-selected="true">Sign in</button>
+        <button class="auth-tab" id="register-tab" type="button" role="tab" aria-selected="false">Create account</button>
+      </div>
+      <form class="auth-form" id="auth-form">
+        <label class="auth-field hidden" id="name-field" for="full-name">Your name<input id="full-name" name="full_name" autocomplete="name" maxlength="120"></label>
+        <label class="auth-field hidden" id="phone-field" for="phone">Phone number<input id="phone" name="phone" type="tel" autocomplete="tel" maxlength="20"></label>
+        <label class="auth-field" for="email">Email address<input id="email" name="email" type="email" autocomplete="email" required maxlength="255"></label>
+        <label class="auth-field" for="password">Password<input id="password" name="password" type="password" autocomplete="current-password" required minlength="8" maxlength="72"></label>
+        <p class="form-message" id="auth-message" role="alert"></p>
+        <button class="checkout-button" id="auth-submit" type="submit">Sign in <span aria-hidden="true">→</span></button>
+      </form>
+      <button class="logout-button hidden" id="logout-button" type="button">Sign out</button>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

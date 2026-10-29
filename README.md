@@ -1,6 +1,6 @@
 # Udupi Hotel Ordering API
 
-A small Express + MySQL REST API for menu management, restaurant orders, and sales reporting. It uses CommonJS, mysql2/promise, JWT-based authentication, and explicit roles for customers, staff, and admins.
+A small Express + MySQL REST API for menu management, restaurant orders, and sales reporting. It uses CommonJS, mysql2/promise, JWT-based authentication, and two roles: customers and admins.
 
 ## Folder guide
 
@@ -8,9 +8,10 @@ A small Express + MySQL REST API for menu management, restaurant orders, and sal
 - `src/config/db.js` creates the shared MySQL connection pool; `src/config/swagger.js` defines the OpenAPI page.
 - `src/routes/index.js` contains the endpoint handlers together with SQL, validation, and auth checks.
 - `src/middleware` holds request validation, JWT authentication, authorization, and central error handling.
-- `src/utils/auth.js` centralizes password hashing, JWT creation, sanitization, and role logic.
+- `src/utils/auth.js` centralizes password hashing, JWT creation, and user sanitization.
 - `database/schema.sql` creates the tables for fresh installs and is safe for new projects.
-- `database/auth-migration.sql` is the non-destructive migration for an existing installation and should only be run on a live schema after review.
+- `database/auth-migration.sql` adds authentication to an older installation and applies the current role and order workflow.
+- `database/two-role-order-workflow-migration.sql` updates an installation that already uses the previous authenticated schema.
 - `scripts/create-admin.js` creates the initial admin account with a bcrypt-hashed password.
 - `test/` contains the unit tests for the auth utilities and money conversion.
 
@@ -18,13 +19,15 @@ A small Express + MySQL REST API for menu management, restaurant orders, and sal
 
 Requirements: Node.js 18+ and MySQL 8.0.
 
-1. Before changing a live database, review the migration impact. The migration adds a `users` table and a nullable `orders.user_id` foreign key. It does not drop or truncate existing menu or order records. Existing orders without an associated user remain visible to staff/admin only.
+1. Before changing an existing database, back it up and review migration preview counts. Do not run migration scripts on a fresh install.
 2. For a fresh install, run `SOURCE /absolute/path/to/udupi-hotel-api/database/schema.sql;` from a MySQL client. This creates the database and the tables with the authentication model included.
-3. For an existing installation, run `SOURCE /absolute/path/to/udupi-hotel-api/database/auth-migration.sql;` only after confirming the schema and sample data are already in an expected state. This is the safe, non-destructive migration path for an active database.
-4. Copy `.env.example` to `.env`, then set the MySQL credentials and a strong `JWT_SECRET` value. Keep `.env` out of Git.
-5. Run `npm install`, then `npm run dev` or `npm start`.
-6. Check `GET http://localhost:3000/api/health` and open `http://localhost:3000/api-docs` for the Swagger UI.
-7. Import `postman/Udupi-Hotel-API.postman_collection.json` into Postman. It includes auth requests and a `token` variable.
+3. For an older installation without auth tables, review the status/role counts printed by `database/auth-migration.sql`, then run it. It adds auth tables, preserves legacy cancellations as `cancelled_at`, maps unfinished intermediate statuses to `pending`, and changes any legacy `STAFF` accounts to `CUSTOMER`.
+4. For an installation that already uses the previous authenticated schema, review and run `database/two-role-order-workflow-migration.sql`. It preserves orders, maps legacy cancellations to `cancelled_at`, maps unfinished statuses to `pending`, and changes legacy `STAFF` accounts to `CUSTOMER` without promoting them.
+5. Copy `.env.example` to `.env`, then set the MySQL credentials and a strong `JWT_SECRET` value. Keep `.env` out of Git.
+6. Run `npm ci`, then `npm run dev` or `npm start`.
+7. Open `http://localhost:3000` to browse the menu, create a customer account, and place orders. Admins use the same sign-in form.
+8. Check `GET http://localhost:3000/api/health` and open `http://localhost:3000/api-docs` for the Swagger UI.
+9. Import `postman/Udupi-Hotel-API.postman_collection.json` into Postman. It includes auth requests and a `token` variable.
 
 ## Environment variables
 
@@ -42,6 +45,8 @@ ADMIN_EMAIL=admin@udupi.local
 ADMIN_NAME=Restaurant Admin
 ADMIN_PHONE=0000000000
 ADMIN_PASSWORD=replace_with_a_strong_password_at_least_8_chars
+# Set this temporarily to the current admin email when resetting an existing account.
+ADMIN_RESET_EMAIL=
 ```
 
 The JWT secret is required and must not be committed to source control.
@@ -56,15 +61,22 @@ npm run create-admin
 
 This script creates the first `ADMIN` user in the `users` table using a bcrypt-hashed password. It does not expose a public admin-registration endpoint and should be used only in a trusted local environment.
 
+To update the credentials of an existing admin, set `ADMIN_RESET_EMAIL` to that account's current email, then set `ADMIN_EMAIL`, `ADMIN_NAME`, `ADMIN_PHONE`, and `ADMIN_PASSWORD` to the new values in `.env`. Run:
+
+```bash
+npm run reset-admin
+```
+
+The reset command updates only the matching existing `ADMIN`; it does not create or promote accounts. It refuses to proceed if the current email is not an admin or the new email belongs to another user. Afterward, remove `ADMIN_RESET_EMAIL` from `.env` and restart the app. Never share or commit `.env`.
+
 ## Authentication model
 
 Roles:
 
 - `CUSTOMER`: register, log in, view the public menu, place orders, and view only their own orders.
-- `STAFF`: view all orders and reports, update valid order status, and cancel eligible orders.
-- `ADMIN`: has staff privileges plus menu management, staff-account creation, and all-order access.
+- `ADMIN`: log in through the same endpoint and sign-in form, view all orders, complete orders, manage menu items, and view sales reports.
 
-All authorization checks are performed on the server side using the authenticated user record retrieved from MySQL.
+Customer registration always creates a `CUSTOMER`; a submitted role is ignored. Use `npm run create-admin` for the initial admin. Protected requests reload the user from MySQL and check the stored role. There is no public admin-registration or staff-account creation endpoint.
 
 ## API contract
 
@@ -86,9 +98,8 @@ Success responses: `{ "success": true, "data": resource }`. Collection responses
 - `GET /api/orders/:id`
 - `PATCH /api/orders/:id/cancel`
 
-### Staff/admin-only endpoints
+### Admin-only endpoints
 
-- `POST /api/auth/staff`
 - `POST /api/menu-items`
 - `PATCH /api/menu-items/:id`
 - `PATCH /api/menu-items/:id/availability`
@@ -141,20 +152,24 @@ The server stores the authenticated user's `full_name` and `phone` from the data
 
 ## Order status and cancellation rules
 
-- Status transitions remain `pending → confirmed → preparing → ready → completed`.
-- Cancellation is permitted only while the status is `pending` or `confirmed`.
-- Customers can cancel only their own eligible orders.
-- Staff/admin users may cancel any eligible order.
-- Daily sales and top-selling summaries count only completed orders.
+- The two normal order statuses are `pending` and `completed`.
+- Only an admin can change an active pending order directly to `completed`; completed orders cannot be reopened.
+- Cancellation is separate from status and recorded in `cancelled_at`. A cancelled order retains `pending` status but is no longer an active pending order.
+- Customers can cancel only their own active pending orders; admins can cancel any active pending order.
+- Daily sales and top-selling summaries count completed, non-cancelled orders only.
+- The frontend shows an Admin — Order Management section only to admins and provides a Mark Completed action. The backend independently enforces the role.
 
 ## Testing and demo
 
 - Run `npm test` for the automated unit tests.
-- For a manual verification, register a customer, log in, create an order, fetch only that order, and confirm a customer cannot access another user's order or change order status.
-- Then create and log in as an admin, create a staff account, manage a menu item, and verify the sales reports work.
+- For a manual verification, register a customer, log in, create an order, and confirm its status is `pending`. Confirm the customer cannot access another user's order or change status.
+- Run `npm run create-admin`, sign in through the same website form using the admin credentials, and verify the Admin — Order Management section appears. Mark the order completed and confirm the refreshed status. A customer must receive `403` when attempting the same API update.
+- Sign in as the admin and verify menu management and sales reports remain available.
 
 ## Migration notes
 
 - For a fresh database, run the full schema file.
-- For an existing installation, run the migration file only after reviewing the live schema and application state.
-- The migration is non-destructive: it adds a `users` table and a nullable `orders.user_id` column, and it keeps existing orders accessible to staff/admin when there is no associated user.
+- For an older unauthenticated installation, review and run `database/auth-migration.sql`.
+- For an installation already using the previous authenticated schema, back up the database, inspect preview counts, and manually run `sudo mysql < database/two-role-order-workflow-migration.sql` from the project folder.
+- The migrations preserve orders and order items. Existing `STAFF` accounts become `CUSTOMER`, never `ADMIN`. Legacy cancelled orders retain cancellation via `cancelled_at`; `confirmed`, `preparing`, and `ready` orders become `pending` because those stages were unfinished. Completed orders remain completed.
+- Migrations are manual and are never executed automatically when the server starts.

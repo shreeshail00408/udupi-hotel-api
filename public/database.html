@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Database Presentation | Udupi Hotel</title>
+  <style>
+    :root { --green:#183c34; --cream:#f6f2e9; --orange:#d97732; --line:#b9c8c1; --white:#fff; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial, sans-serif; color:var(--green); background:var(--cream); }
+    header { background:var(--green); color:white; padding:24px 5%; display:flex; justify-content:space-between; align-items:center; }
+    header a { color:white; text-decoration:none; border:1px solid #ffffff55; padding:10px 16px; border-radius:999px; }
+    main { max-width:1180px; margin:auto; padding:48px 24px 80px; }
+    h1 { font-size:clamp(36px,6vw,72px); margin:8px 0; }
+    h2 { font-size:32px; margin-top:0; }
+    h3 { margin:0; padding-bottom:12px; border-bottom:1px solid var(--line); }
+    .intro { max-width:720px; color:#48625a; line-height:1.7; font-size:18px; }
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin:32px 0; }
+    .stat { background:white; border-radius:16px; padding:24px; box-shadow:0 8px 30px #183c3412; }
+    .stat strong { display:block; font-size:38px; color:var(--orange); }
+    .diagram { position:relative; display:grid; grid-template-columns:repeat(2,minmax(260px,1fr)); gap:44px 100px; margin:50px 0; }
+    .table-card { background:white; border-radius:14px; box-shadow:0 12px 35px #183c3418; overflow:hidden; position:relative; z-index:2; }
+    .table-card header { border-radius:0; padding:18px 20px; }
+    .fields { padding:10px 20px 18px; font-size:14px; }
+    .field { display:flex; justify-content:space-between; gap:12px; padding:7px 0; border-bottom:1px solid #eef0ec; }
+    .field:last-child { border:none; }
+    .type { color:#78877f; text-align:right; }
+    .key { color:var(--orange); font-weight:bold; }
+    .relationships { margin-top:24px; background:white; border-radius:16px; padding:28px; }
+    .relationship { display:grid; grid-template-columns:1fr 32px 1fr; align-items:center; padding:12px 0; border-bottom:1px solid #edf0ec; }
+    .relationship:last-child { border:none; }
+    .relationship .arrow { text-align:center; color:var(--orange); font-weight:bold; }
+    .sql { background:#132a25; color:#f7fbf8; border-radius:16px; padding:24px; overflow:auto; margin-top:28px; }
+    pre { margin:0; line-height:1.6; }
+    button { background:white; color:var(--green); border:0; border-radius:999px; padding:10px 16px; cursor:pointer; font-weight:bold; }
+    .menu-table { background:white; border-radius:16px; overflow:auto; margin-top:28px; box-shadow:0 12px 35px #183c3412; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:14px 18px; text-align:left; border-bottom:1px solid #edf0ec; }
+    th { background:#183c34; color:white; }
+    .available { color:#287a51; font-weight:bold; }
+    .unavailable { color:#a04444; font-weight:bold; }
+    .order-login { display:flex; gap:10px; align-items:end; flex-wrap:wrap; background:white; border-radius:16px; padding:20px; margin-top:28px; }
+    .order-login label { display:flex; flex-direction:column; gap:8px; color:#48625a; flex:1 1 220px; }
+    .order-login input { border:1px solid var(--line); border-radius:8px; padding:12px; font-size:15px; }
+    .order-login button { background:var(--green); color:white; padding:13px 20px; }
+    .order-status { margin-top:12px; color:#48625a; }
+    #customer-orders-section { margin-top:42px; }
+    @media(max-width:700px) { .stats { grid-template-columns:repeat(2,1fr); } .diagram { grid-template-columns:1fr; gap:24px; } }
+    @media print { header button { display:none; } header a { display:none; } body { background:white; } main { padding-top:24px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>UDUPI HOTEL • DATABASE OVERVIEW</strong>
+    <div>
+      <a href="/">Website</a>
+      <button onclick="window.print()">Print / Save PDF</button>
+    </div>
+  </header>
+
+  <main>
+    <span>MySQL • InnoDB</span>
+    <h1>Database <em>presentation</em></h1>
+    <p class="intro">The database stores customer accounts, restaurant menu items, orders, and the individual products included in each order.</p>
+
+    <section class="stats" aria-label="Database summary">
+      <div class="stat"><strong>4</strong>Tables</div>
+      <div class="stat"><strong>2</strong>Roles</div>
+      <div class="stat"><strong>3</strong>Payment types</div>
+      <div class="stat"><strong>2</strong>Order states</div>
+    </section>
+
+    <h2>Entity relationship diagram</h2>
+    <section class="diagram">
+      <article class="table-card">
+        <header><strong>users</strong></header>
+        <div class="fields">
+          <div class="field"><span><span class="key">PK</span> id</span><span class="type">BIGINT</span></div>
+          <div class="field"><span>full_name</span><span class="type">VARCHAR(120)</span></div>
+          <div class="field"><span><span class="key">UQ</span> email</span><span class="type">VARCHAR(255)</span></div>
+          <div class="field"><span>phone</span><span class="type">VARCHAR(20)</span></div>
+          <div class="field"><span>password_hash</span><span class="type">VARCHAR(255)</span></div>
+          <div class="field"><span>role</span><span class="type">CUSTOMER / ADMIN</span></div>
+        </div>
+      </article>
+
+      <article class="table-card">
+        <header><strong>menu_items</strong></header>
+        <div class="fields">
+          <div class="field"><span><span class="key">PK</span> id</span><span class="type">BIGINT</span></div>
+          <div class="field"><span>name</span><span class="type">VARCHAR(120)</span></div>
+          <div class="field"><span>description</span><span class="type">TEXT</span></div>
+          <div class="field"><span>category</span><span class="type">VARCHAR(80)</span></div>
+          <div class="field"><span>price</span><span class="type">DECIMAL(10,2)</span></div>
+          <div class="field"><span>is_available</span><span class="type">BOOLEAN</span></div>
+        </div>
+      </article>
+
+      <article class="table-card">
+        <header><strong>orders</strong></header>
+        <div class="fields">
+          <div class="field"><span><span class="key">PK</span> id</span><span class="type">BIGINT</span></div>
+          <div class="field"><span><span class="key">FK</span> user_id</span><span class="type">BIGINT, nullable</span></div>
+          <div class="field"><span>customer_name</span><span class="type">VARCHAR(120)</span></div>
+          <div class="field"><span>phone</span><span class="type">VARCHAR(20)</span></div>
+          <div class="field"><span>payment_method</span><span class="type">cash / upi / card</span></div>
+          <div class="field"><span>total_amount</span><span class="type">DECIMAL(10,2)</span></div>
+          <div class="field"><span>status</span><span class="type">pending / completed</span></div>
+          <div class="field"><span>cancelled_at</span><span class="type">TIMESTAMP</span></div>
+        </div>
+      </article>
+
+      <article class="table-card">
+        <header><strong>order_items</strong></header>
+        <div class="fields">
+          <div class="field"><span><span class="key">PK</span> id</span><span class="type">BIGINT</span></div>
+          <div class="field"><span><span class="key">FK</span> order_id</span><span class="type">BIGINT</span></div>
+          <div class="field"><span><span class="key">FK</span> menu_item_id</span><span class="type">BIGINT</span></div>
+          <div class="field"><span>item_name</span><span class="type">VARCHAR(120)</span></div>
+          <div class="field"><span>unit_price</span><span class="type">DECIMAL(10,2)</span></div>
+          <div class="field"><span>quantity</span><span class="type">INT</span></div>
+          <div class="field"><span>subtotal</span><span class="type">DECIMAL(10,2)</span></div>
+        </div>
+      </article>
+    </section>
+
+    <h2>Menu items stored in the database</h2>
+    <div class="menu-table">
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Name</th><th>Category</th><th>Price</th><th>Status</th></tr>
+        </thead>
+        <tbody id="database-items">
+          <tr><td colspan="5">Loading items...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <section id="customer-orders-section">
+      <h2>Customer orders and ordered items</h2>
+      <form class="order-login" id="order-login-form">
+        <label>Admin email<input id="order-admin-email" type="email" autocomplete="username" required></label>
+        <label>Admin password<input id="order-admin-password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Load customer orders</button>
+      </form>
+      <p class="order-status" id="order-status" role="status"></p>
+      <div class="menu-table">
+        <table>
+          <thead>
+            <tr><th>Order ID</th><th>Customer</th><th>Item</th><th>Quantity</th><th>Unit price</th><th>Subtotal</th><th>Payment</th><th>Status</th></tr>
+          </thead>
+          <tbody id="database-orders">
+            <tr><td colspan="8">Sign in as an administrator to view customer orders.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="relationships">
+      <h2>Relationships</h2>
+      <div class="relationship"><strong>users</strong><span class="arrow">1 → many</span><span>orders</span></div>
+      <div class="relationship"><strong>orders</strong><span class="arrow">1 → many</span><span>order_items</span></div>
+      <div class="relationship"><strong>menu_items</strong><span class="arrow">1 → many</span><span>order_items</span></div>
+    </section>
+
+    <h2>Useful demonstration query</h2>
+    <div class="sql"><pre>SELECT o.id AS order_id,
+       u.full_name,
+       o.payment_method,
+       o.total_amount,
+       o.status
+FROM orders o
+JOIN users u ON u.id = o.user_id
+ORDER BY o.created_at DESC;</pre></div>
+  </main>
+
+  <script>
+    async function loadDatabaseItems() {
+      const body = document.getElementById('database-items');
+      try {
+        const response = await fetch('/api/menu-items?limit=100');
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error('Could not load database items');
+
+        const items = result.data || [];
+        body.replaceChildren();
+        if (!items.length) {
+          const row = body.insertRow();
+          const cell = row.insertCell();
+          cell.colSpan = 5;
+          cell.textContent = 'No menu items found in the database.';
+          return;
+        }
+
+        items.forEach(item => {
+          const row = body.insertRow();
+          row.insertCell().textContent = item.id;
+          row.insertCell().textContent = item.name;
+          row.insertCell().textContent = item.category;
+          row.insertCell().textContent = `₹${Number(item.price).toFixed(2)}`;
+          const statusCell = row.insertCell();
+          statusCell.textContent = item.is_available ? 'Available' : 'Unavailable';
+          statusCell.className = item.is_available ? 'available' : 'unavailable';
+        });
+      } catch (error) {
+        body.replaceChildren();
+        const row = body.insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = 5;
+        cell.textContent = error.message;
+      }
+    }
+
+    async function loadCustomerOrders(email, password) {
+      const body = document.getElementById('database-orders');
+      const status = document.getElementById('order-status');
+      status.textContent = 'Loading customer orders...';
+      body.replaceChildren();
+
+      try {
+        const loginResponse = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const loginResult = await loginResponse.json();
+        if (!loginResponse.ok || !loginResult.success) {
+          throw new Error(loginResult.error?.message || 'Admin login failed');
+        }
+        if (loginResult.data.user.role !== 'ADMIN') {
+          throw new Error('Administrator access is required');
+        }
+
+        const token = loginResult.data.token;
+        const ordersResponse = await fetch('/api/orders?limit=100', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const ordersResult = await ordersResponse.json();
+        if (!ordersResponse.ok || !ordersResult.success) {
+          throw new Error(ordersResult.error?.message || 'Could not load orders');
+        }
+
+        const orders = ordersResult.data || [];
+        if (!orders.length) {
+          const row = body.insertRow();
+          const cell = row.insertCell();
+          cell.colSpan = 8;
+          cell.textContent = 'No customer orders found.';
+          status.textContent = 'No customer orders have been placed.';
+          return;
+        }
+
+        let itemCount = 0;
+        for (const order of orders) {
+          const detailResponse = await fetch(`/api/orders/${order.id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const detailResult = await detailResponse.json();
+          if (!detailResponse.ok || !detailResult.success) continue;
+
+          const orderStatus = order.cancelled_at ? 'cancelled' : order.status;
+          const items = detailResult.data.items || [];
+          if (!items.length) {
+            const row = body.insertRow();
+            row.insertCell().textContent = order.id;
+            row.insertCell().textContent = order.customer_name;
+            row.insertCell().textContent = 'No item details';
+            row.insertCell().textContent = '-';
+            row.insertCell().textContent = '-';
+            row.insertCell().textContent = '-';
+            row.insertCell().textContent = order.payment_method;
+            row.insertCell().textContent = orderStatus;
+            continue;
+          }
+
+          items.forEach(item => {
+            itemCount += 1;
+            const row = body.insertRow();
+            row.insertCell().textContent = order.id;
+            row.insertCell().textContent = order.customer_name;
+            row.insertCell().textContent = item.item_name;
+            row.insertCell().textContent = item.quantity;
+            row.insertCell().textContent = `₹${Number(item.unit_price).toFixed(2)}`;
+            row.insertCell().textContent = `₹${Number(item.subtotal).toFixed(2)}`;
+            row.insertCell().textContent = order.payment_method;
+            row.insertCell().textContent = orderStatus;
+          });
+        }
+        status.textContent = `${orders.length} customer order(s) loaded with ${itemCount} ordered item(s).`;
+      } catch (error) {
+        status.textContent = error instanceof Error ? error.message : 'Could not load customer orders.';
+        const row = body.insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = 8;
+        cell.textContent = status.textContent;
+      } finally {
+        document.getElementById('order-admin-password').value = '';
+      }
+    }
+
+    document.getElementById('order-login-form').addEventListener('submit', event => {
+      event.preventDefault();
+      const email = document.getElementById('order-admin-email').value.trim();
+      const password = document.getElementById('order-admin-password').value;
+      loadCustomerOrders(email, password);
+    });
+
+    loadDatabaseItems();
+  </script>
+</body>
+</html>
